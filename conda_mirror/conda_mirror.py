@@ -24,7 +24,8 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'linux-32',
                      'osx-64',
                      'win-64',
-                     'win-32']
+                     'win-32',
+                     'noarch']
 
 
 def _maybe_split_channel(channel):
@@ -139,7 +140,7 @@ def _make_arg_parser():
     ap.add_argument(
         '--platform',
         help=("The OS platform(s) to mirror. one of: {'linux-64', 'linux-32',"
-              "'osx-64', 'win-32', 'win-64'}"),
+              "'osx-64', 'win-32', 'win-64', 'noarch'}"),
     )
     ap.add_argument(
         '-v', '--verbose',
@@ -381,7 +382,7 @@ def get_repodata(channel, platform):
     url = url_template.format(channel=channel, platform=platform,
                               file_name='repodata.json')
 
-    resp = requests.get(url).json()
+    resp = requests.get(url, verify=False).json()
     info = resp.get('info', {})
     packages = resp.get('packages', {})
     # Patch the repodata.json so that all package info dicts contain a "subdir"
@@ -416,7 +417,7 @@ def _download(url, target_directory):
     download_filename = os.path.join(target_directory, target_filename)
     logger.debug('downloading to %s', download_filename)
     with open(download_filename, 'w+b') as tf:
-        ret = requests.get(url, stream=True)
+        ret = requests.get(url, verify=False, stream=True)
         for data in ret.iter_content(chunk_size):
             tf.write(data)
         file_size = os.path.getsize(download_filename)
@@ -788,11 +789,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             shutil.move(download_path, move_path)
 
     # Also need to make a "noarch" channel or conda gets mad
-    noarch_path = os.path.join(target_directory, 'noarch')
-    if not os.path.exists(noarch_path):
-        os.makedirs(noarch_path, exist_ok=True)
-        noarch_repodata = {'info': {}, 'packages': {}}
-        _write_repodata(noarch_path, noarch_repodata)
+    if platform != 'noarch':
+        noarch_path = os.path.join(target_directory, 'noarch')
+        if not os.path.exists(noarch_path):
+            os.makedirs(noarch_path, exist_ok=True)
+            noarch_repodata = {'info': {}, 'packages': {}}
+            _write_repodata(noarch_path, noarch_repodata)
 
     return summary
 
